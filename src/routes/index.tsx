@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CloudRain, Mountain, Radio, Users } from "lucide-react";
+import { ArrowRight, CloudRain, LoaderCircle, Mountain, Radio, Users } from "lucide-react";
 
 import { CameroonRiskMap } from "@/components/CameroonRiskMap";
 import { RiskBadge, RiskLegend } from "@/components/RiskBadge";
@@ -9,32 +9,124 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { alertsQuery, regionsQuery, reportsQuery, riskQuery } from "@/lib/queries";
 import { asRisk, higherRisk, relativeTime, riskText, type RiskLevel } from "@/lib/risk";
+import type { ForecastDay } from "@/lib/open-meteo.server";
 import { getWeather } from "@/lib/weather.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 function WeatherDemo() {
   const fetchWeather = useServerFn(getWeather);
-  const [days, setDays] = useState<any[]>([]);
+  const [days, setDays] = useState<ForecastDay[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    // Coordinates for akok ndoe, Cameroon
-    const result = await fetchWeather({
-      data: { latitude: 3.866100, longitude: 11.515400 },
-    });
-    setDays(result);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await fetchWeather({
+        data: { latitude: 3.8661, longitude: 11.5154 },
+      });
+      setDays(result);
+      setSelectedDate(result[0]?.date ?? null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load the forecast.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
+  const levelFor = (day: ForecastDay): RiskLevel => {
+    if (day.precipitationSum >= 30) return "high";
+    if (day.precipitationSum >= 15 || day.windMax >= 45) return "moderate";
+    return "low";
+  };
+
+  const interpretationFor = (day: ForecastDay) => {
+    const level = levelFor(day);
+    if (level === "high") {
+      return {
+        meaning: "Heavy rain is expected. Runoff can build quickly, especially in low-lying areas.",
+        impact: "Higher flood concern, with possible slope instability where the ground is already wet.",
+        action: "Keep away from drains, rivers and steep slopes; follow local alerts.",
+      };
+    }
+    if (level === "moderate") {
+      return {
+        meaning: "Rain or wind is above a quiet-weather level and conditions could change during the day.",
+        impact: "Somewhat higher flood or landslide concern near waterways, poor drainage and cut slopes.",
+        action: "Check your route and avoid crossing moving water during or after rain.",
+      };
+    }
+    return {
+      meaning: "Rainfall and wind are currently below the thresholds used for heightened concern.",
+      impact: "No weather-driven increase in flood or landslide concern is indicated by this forecast alone.",
+      action: "Stay informed and use the calmer period to keep drains clear.",
+    };
   };
 
   return (
-    <div>
-      <button onClick={load}>Load forecast</button>
-      <ul>
-        {days.map((d) => (
-          <li key={d.date}>
-            {d.date}: {d.tempMax}°C, {d.precipitationSum}mm rain
-          </li>
-        ))}
-      </ul>
+    <div className="space-y-4">
+      <Button onClick={load} disabled={isLoading}>
+        {isLoading ? <LoaderCircle className="animate-spin" /> : <CloudRain />}
+        {isLoading ? "Checking service..." : "Load 7-day forecast"}
+      </Button>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {days.length > 0 ? (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {days.map((day) => (
+              <li key={day.date}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(day.date)}
+                  aria-pressed={selectedDate === day.date}
+                  className={`w-full rounded-md border bg-background p-3 text-left text-sm transition-colors hover:border-primary hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedDate === day.date ? "border-primary bg-muted/50" : ""}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold">{day.date}</p>
+                    <RiskBadge level={levelFor(day)} />
+                  </div>
+                  <p className="mt-2 text-muted-foreground">
+                    {day.tempMax}°C · {day.precipitationSum} mm rain · {day.windMax} km/h wind
+                  </p>
+                  <p className="mt-2 text-xs font-medium text-primary">Select to interpret</p>
+                </button>
+              </li>
+          ))}
+          </ul>
+          {selectedDay ? (
+            <div className="mt-3 rounded-md border border-primary/20 bg-primary/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-display font-bold">What {selectedDay.date} means</h3>
+                <RiskBadge level={levelFor(selectedDay)} label="Weather concern" variant="solid" />
+              </div>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="font-semibold text-foreground">The values</dt>
+                  <dd className="mt-1 text-muted-foreground">
+                    {selectedDay.precipitationSum} mm rain, {selectedDay.tempMax}°C maximum temperature,
+                    and {selectedDay.windMax} km/h wind.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">Why it matters</dt>
+                  <dd className="mt-1 text-muted-foreground">{interpretationFor(selectedDay).meaning}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">Disaster implication</dt>
+                  <dd className="mt-1 text-muted-foreground">{interpretationFor(selectedDay).impact}</dd>
+                </div>
+              </dl>
+              <p className="mt-3 border-t border-primary/15 pt-3 text-sm font-medium">
+                Recommended: {interpretationFor(selectedDay).action}
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -152,6 +244,18 @@ function Home() {
                 Highest of flood and landslide risk per region. Sample data for design review.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <h2 className="font-display text-lg font-bold">Open-Meteo forecast test</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verify that the weather service is returning forecast data for Cameroon.
+          </p>
+          <div className="mt-4">
+            <WeatherDemo />
           </div>
         </div>
       </section>
