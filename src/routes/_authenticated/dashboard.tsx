@@ -27,8 +27,8 @@ import {
   localityForecastsQuery,
   regionsQuery,
   rolesQuery,
-  smsMessagesQuery,
-  subscriptionsQuery,
+  userSmsMessagesQuery,
+  userSubscriptionsQuery,
 } from "@/lib/queries";
 import { sendLocalityReport, sendMyDigest } from "@/lib/sms.functions";
 import { asRisk, countdown, exactTime, higherRisk, onsetWindow, relativeTime } from "@/lib/risk";
@@ -58,8 +58,14 @@ function UserDashboard() {
   const regions = useQuery(regionsQuery);
   const localities = useQuery(localitiesQuery);
   const forecasts = useQuery(localityForecastsQuery);
-  const subs = useQuery(subscriptionsQuery);
-  const messages = useQuery(smsMessagesQuery);
+  const subs = useQuery({
+    ...userSubscriptionsQuery(user?.id ?? ""),
+    enabled: Boolean(user?.id),
+  });
+  const messages = useQuery({
+    ...userSmsMessagesQuery(user?.id ?? ""),
+    enabled: Boolean(user?.id),
+  });
   const roles = useQuery({ ...rolesQuery(user?.id ?? ""), enabled: Boolean(user?.id) });
 
   const [phone, setPhone] = useState("");
@@ -117,10 +123,12 @@ function UserDashboard() {
 
   const toggleSub = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      if (!user) throw new Error("Not signed in");
       const { error } = await supabase
         .from("sms_subscriptions")
         .update({ is_active: active })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["sms_subscriptions"] }),
@@ -129,7 +137,12 @@ function UserDashboard() {
 
   const removeSub = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sms_subscriptions").delete().eq("id", id);
+      if (!user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("sms_subscriptions")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

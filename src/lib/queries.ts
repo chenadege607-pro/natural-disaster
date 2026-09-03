@@ -224,6 +224,21 @@ export const subscriptionsQuery = queryOptions({
   staleTime: 30 * 1000,
 });
 
+export function userSubscriptionsQuery(userId: string) {
+  return queryOptions({
+    queryKey: ["sms_subscriptions", userId],
+    queryFn: async () =>
+      unwrap<SmsSubscription[]>(
+        await supabase
+          .from("sms_subscriptions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at"),
+      ),
+    staleTime: 30 * 1000,
+  });
+}
+
 export const smsMessagesQuery = queryOptions({
   queryKey: ["sms_messages"],
   queryFn: async () =>
@@ -236,6 +251,22 @@ export const smsMessagesQuery = queryOptions({
     ),
   staleTime: 15 * 1000,
 });
+
+export function userSmsMessagesQuery(userId: string) {
+  return queryOptions({
+    queryKey: ["sms_messages", userId],
+    queryFn: async () =>
+      unwrap<SmsMessage[]>(
+        await supabase
+          .from("sms_messages")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ),
+    staleTime: 15 * 1000,
+  });
+}
 
 export function profileQuery(userId: string) {
   return queryOptions({
