@@ -2,6 +2,7 @@
 
 Build a web-based natural disaster forecasting application for Cameroon, covering all 10 regions. Focus first on strong, polished UI/UX design (using realistic mock/sample data for now — real environmental API integration comes later).
 
+
 Core concept: helps citizens and local officials understand flood and landslide risk across Cameroon's regions, with alerts and historical context.
 
 Key screens/features to design:
