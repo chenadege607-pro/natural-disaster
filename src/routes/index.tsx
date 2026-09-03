@@ -9,6 +9,35 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { alertsQuery, regionsQuery, reportsQuery, riskQuery } from "@/lib/queries";
 import { asRisk, higherRisk, relativeTime, riskText, type RiskLevel } from "@/lib/risk";
+import { getWeather } from "@/lib/weather.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+
+function WeatherDemo() {
+  const fetchWeather = useServerFn(getWeather);
+  const [days, setDays] = useState<any[]>([]);
+
+  const load = async () => {
+    // Coordinates for akok ndoe, Cameroon
+    const result = await fetchWeather({
+      data: { latitude: 3.866100, longitude: 11.515400 },
+    });
+    setDays(result);
+  };
+
+  return (
+    <div>
+      <button onClick={load}>Load forecast</button>
+      <ul>
+        {days.map((d) => (
+          <li key={d.date}>
+            {d.date}: {d.tempMax}°C, {d.precipitationSum}mm rain
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
