@@ -7,6 +7,10 @@ function env(name: string): string | undefined {
   return value && value.trim() !== "" ? value.trim() : undefined;
 }
 
+export function groqApiKey() {
+  return env("GROQ_API_KEY");
+}
+
 export const openMeteo = {
   weatherUrl: "https://api.open-meteo.com/v1/forecast",
   floodUrl: "https://flood-api.open-meteo.com/v1/flood",

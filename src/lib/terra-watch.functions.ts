@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { groqApiKey } from "@/backend/config.server";
+
 const coordinates = z.object({ latitude: z.number(), longitude: z.number() });
 
 export type PlaceResult = {
@@ -23,6 +25,45 @@ export type HazardResult = {
   readings: HazardReading[];
   soilMoisture: number | null;
 };
+
+export const askGroq = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        location: z.string().max(120),
+        hazardData: z.string().max(12000),
+        messages: z
+          .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) }))
+          .max(20),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const apiKey = groqApiKey();
+    if (!apiKey) throw new Error("GROQ_API_KEY is not configured on the server.");
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-120b",
+        temperature: 0.4,
+        max_tokens: 500,
+        messages: [
+          {
+            role: "system",
+            content: `You are SentinelCM's disaster information assistant. Explain data simply and avoid presenting model readings as official warnings. Location: ${data.location}. Hazard data: ${data.hazardData}`,
+          },
+          ...data.messages,
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`Groq request failed (${response.status})`);
+    const body = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return body.choices?.[0]?.message?.content ?? "No answer returned.";
+  });
 
 export const searchPlaces = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ query: z.string().min(2).max(80) }).parse(data))

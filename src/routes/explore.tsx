@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -10,10 +10,8 @@ import {
   MapPin,
   Search,
   Send,
-  Settings,
   X,
 } from "lucide-react";
-
 import { PageHeader } from "@/components/PageHeader";
 import { RiskBadge } from "@/components/RiskBadge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  askGroq,
   getPlaceHazard,
   getPlaceWeather,
   searchPlaces,
@@ -37,6 +36,7 @@ function ExplorePage() {
   const search = useServerFn(searchPlaces);
   const weather = useServerFn(getPlaceWeather);
   const hazard = useServerFn(getPlaceHazard);
+  const ask = useServerFn(askGroq);
   const [query, setQuery] = useState("");
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [selected, setSelected] = useState<PlaceResult | null>(null);
@@ -49,12 +49,9 @@ function ExplorePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [groqKey, setGroqKey] = useState("");
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
 
-  useEffect(() => setGroqKey(window.localStorage.getItem("sentinelGroqKey") ?? ""), []);
   async function findPlaces(event: FormEvent) {
     event.preventDefault();
     if (query.trim().length < 2) return;
@@ -68,11 +65,12 @@ function ExplorePage() {
       setBusy(false);
     }
   }
+
   async function choosePlace(place: PlaceResult) {
     setSelected(place);
     setPlaces([]);
-    setHazardData(null);
     setHazardType("");
+    setHazardData(null);
     setBusy(true);
     setError("");
     try {
@@ -85,6 +83,7 @@ function ExplorePage() {
       setBusy(false);
     }
   }
+
   async function checkHazard() {
     if (!selected || !hazardType) return;
     setBusy(true);
@@ -102,55 +101,33 @@ function ExplorePage() {
       setBusy(false);
     }
   }
+
   async function askAssistant(event: FormEvent) {
     event.preventDefault();
     if (!message.trim()) return;
-    if (!groqKey) {
-      setSettingsOpen(true);
-      return;
-    }
-    const prompt = message.trim();
+    const nextChat = [...chat, { role: "user" as const, content: message.trim() }];
     setMessage("");
-    const nextChat = [...chat, { role: "user" as const, content: prompt }];
     setChat(nextChat);
     try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          temperature: 0.4,
-          max_tokens: 500,
-          messages: [
-            {
-              role: "system",
-              content: `You are SentinelCM's disaster information assistant. Explain data simply. Location: ${selected?.name ?? "unknown"}. Hazard data: ${JSON.stringify(hazardData ?? "none")}`,
-            },
-            ...nextChat,
-          ],
-        }),
-      });
-      if (!response.ok) throw new Error();
-      const body = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      setChat([
-        ...nextChat,
-        {
-          role: "assistant",
-          content: body.choices?.[0]?.message?.content ?? "No answer returned.",
+      const answer = await ask({
+        data: {
+          location: selected?.name ?? "unknown",
+          hazardData: JSON.stringify(hazardData ?? "none"),
+          messages: nextChat,
         },
-      ]);
+      });
+      setChat([...nextChat, { role: "assistant", content: answer }]);
     } catch {
       setChat([
         ...nextChat,
         {
           role: "assistant",
-          content: "I could not reach the assistant. Check your API key in settings.",
+          content: "The assistant is unavailable. Configure GROQ_API_KEY in the server .env file.",
         },
       ]);
     }
   }
+
   const worst = hazardData?.readings.some((reading) => reading.level === "high")
     ? "high"
     : hazardData?.readings.some((reading) => reading.level === "moderate")
@@ -162,16 +139,6 @@ function ExplorePage() {
         eyebrow="Explore"
         title="Find a place and check its hazards"
         description="Search any region, town or neighbourhood in Cameroon, then inspect live weather and model readings for flood or landslide conditions."
-        actions={
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Assistant settings"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Settings />
-          </Button>
-        }
       />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <form onSubmit={findPlaces} className="max-w-2xl">
@@ -290,7 +257,7 @@ function ExplorePage() {
                         {hazardData.type === "flood" ? "Flood" : "Landslide"} readings
                       </h3>
                       <RiskBadge
-                        level={worst ?? "low"}
+                        level={worst}
                         label={
                           worst === "high"
                             ? "Elevated readings"
@@ -388,57 +355,6 @@ function ExplorePage() {
             </div>
           )}
         </>
-      )}
-      {settingsOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-deep/50 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-start justify-between">
-              <div>
-                <CardTitle>Assistant settings</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Your key stays in this browser and is sent only to Groq.
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(false)}>
-                <X />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <Label htmlFor="groq-key">Groq API key</Label>
-              <Input
-                id="groq-key"
-                type="password"
-                value={groqKey}
-                onChange={(event) => setGroqKey(event.target.value)}
-                placeholder="gsk_..."
-                className="mt-2"
-              />
-              <div className="mt-4 flex gap-2">
-                <Button
-                  onClick={() => {
-                    window.localStorage.setItem("sentinelGroqKey", groqKey.trim());
-                    setSettingsOpen(false);
-                  }}
-                >
-                  Save key
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setGroqKey("");
-                    window.localStorage.removeItem("sentinelGroqKey");
-                  }}
-                >
-                  Clear
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       )}
     </div>
   );
