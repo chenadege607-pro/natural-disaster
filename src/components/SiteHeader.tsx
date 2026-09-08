@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/useSession";
 const links = [
   { to: "/", label: "Home" },
   { to: "/map", label: "Risk map" },
+  { to: "/explore", label: "Explore" },
   { to: "/alerts", label: "Alerts" },
   { to: "/trends", label: "Trends" },
   { to: "/report", label: "Report" },

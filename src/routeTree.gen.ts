@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as TrendsRouteImport } from './routes/trends'
@@ -37,6 +38,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreRoute = ExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/auth': typeof AuthRoute
+  '/explore': typeof ExploreRoute
   '/map': typeof MapRoute
   '/report': typeof ReportRoute
   '/trends': typeof TrendsRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/auth': typeof AuthRoute
+  '/explore': typeof ExploreRoute
   '/map': typeof MapRoute
   '/report': typeof ReportRoute
   '/trends': typeof TrendsRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/auth': typeof AuthRoute
+  '/explore': typeof ExploreRoute
   '/map': typeof MapRoute
   '/report': typeof ReportRoute
   '/trends': typeof TrendsRoute
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/auth'
+    | '/explore'
     | '/map'
     | '/report'
     | '/trends'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/auth'
+    | '/explore'
     | '/map'
     | '/report'
     | '/trends'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/alerts'
     | '/auth'
+    | '/explore'
     | '/map'
     | '/report'
     | '/trends'
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AlertsRoute: typeof AlertsRoute
   AuthRoute: typeof AuthRoute
+  ExploreRoute: typeof ExploreRoute
   MapRoute: typeof MapRoute
   ReportRoute: typeof ReportRoute
   TrendsRoute: typeof TrendsRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore': {
+      id: '/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof ExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -246,6 +266,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AlertsRoute: AlertsRoute,
   AuthRoute: AuthRoute,
+  ExploreRoute: ExploreRoute,
   MapRoute: MapRoute,
   ReportRoute: ReportRoute,
   TrendsRoute: TrendsRoute,
