@@ -8,9 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useSession } from "@/hooks/useSession";
+import { mysqlSignIn, mysqlSignUp } from "@/lib/mysql-api";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -52,39 +51,16 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setAwaitingConfirm(true);
-          toast.success("Check your email to confirm your account.");
-          return;
-        }
+        await mysqlSignUp({ fullName, email, password });
         toast.success("Account created.");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await mysqlSignIn({ email, password });
         toast.success("Signed in.");
       }
+      window.location.replace("/dashboard");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Authentication failed");
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setBusy(true);
-    try {
-      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Google sign-in failed");
       setBusy(false);
     }
   }
@@ -149,21 +125,6 @@ function AuthPage() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-6 w-full"
-              onClick={handleGoogle}
-              disabled={busy}
-            >
-              <GoogleMark /> Continue with Google
-            </Button>
-
-            <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-              <span className="h-px flex-1 bg-border" /> or use email{" "}
-              <span className="h-px flex-1 bg-border" />
-            </div>
 
             {awaitingConfirm ? (
               <div className="rounded-lg border bg-secondary p-4 text-sm">

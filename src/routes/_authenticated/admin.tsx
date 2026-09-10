@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { Activity, BellRing, FileText, Loader2, Radio, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,7 +36,7 @@ import {
   rolesQuery,
   smsMessagesQuery,
 } from "@/lib/queries";
-import { broadcastLocalityAlert } from "@/lib/sms.functions";
+import { mysqlApi } from "@/lib/mysql-api";
 import {
   asRisk,
   countdown,
@@ -81,7 +80,6 @@ function AdminConsole() {
   const [broadcastLocality, setBroadcastLocality] = useState("");
   const [note, setNote] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
-  const broadcast = useServerFn(broadcastLocalityAlert);
 
   const isAdmin = (roles.data ?? []).includes("admin");
   const isOfficial = isAdmin || (roles.data ?? []).includes("official");
@@ -105,7 +103,7 @@ function AdminConsole() {
   }, [localities.data, forecasts.data, regionFilter]);
 
   const send = useMutation({
-    mutationFn: async () => broadcast({ data: { localityId: broadcastLocality, note } }),
+    mutationFn: async () => mysqlApi.post("sms/broadcast", { localityId: broadcastLocality, note }),
     onSuccess: (result) => {
       toast.success(
         result.simulated

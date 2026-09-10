@@ -1,6 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-
-import { supabase } from "@/integrations/supabase/client";
+import { mysqlApi, mysqlSession } from "@/lib/mysql-api";
 
 export type Region = {
   slug: string;
@@ -65,72 +64,45 @@ export type CommunityReport = {
   created_at: string;
 };
 
-function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
-  if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as T;
-}
-
 export const regionsQuery = queryOptions({
   queryKey: ["regions"],
-  queryFn: async () => unwrap<Region[]>(await supabase.from("regions").select("*").order("name")),
+  queryFn: () => mysqlApi.get<Region[]>("regions"),
   staleTime: 5 * 60 * 1000,
 });
 
 export const riskQuery = queryOptions({
   queryKey: ["region_risk"],
-  queryFn: async () => unwrap<RegionRisk[]>(await supabase.from("region_risk").select("*")),
+  queryFn: () => mysqlApi.get<RegionRisk[]>("risk"),
   staleTime: 60 * 1000,
 });
 
 export const alertsQuery = queryOptions({
   queryKey: ["alerts"],
-  queryFn: async () =>
-    unwrap<Alert[]>(
-      await supabase
-        .from("alerts")
-        .select("*")
-        .eq("is_active", true)
-        .order("issued_at", { ascending: false }),
-    ),
+  queryFn: () => mysqlApi.get<Alert[]>("alerts"),
   staleTime: 60 * 1000,
 });
 
 export const readingsQuery = queryOptions({
   queryKey: ["environmental_readings"],
-  queryFn: async () =>
-    unwrap<Reading[]>(
-      await supabase
-        .from("environmental_readings")
-        .select("*")
-        .order("recorded_on", { ascending: true }),
-    ),
+  queryFn: () => mysqlApi.get<Reading[]>("readings"),
   staleTime: 5 * 60 * 1000,
 });
 
 export const eventsQuery = queryOptions({
   queryKey: ["disaster_events"],
-  queryFn: async () =>
-    unwrap<DisasterEvent[]>(
-      await supabase.from("disaster_events").select("*").order("occurred_on", { ascending: false }),
-    ),
+  queryFn: () => mysqlApi.get<DisasterEvent[]>("events"),
   staleTime: 5 * 60 * 1000,
 });
 
 export const reportsQuery = queryOptions({
   queryKey: ["community_reports"],
-  queryFn: async () =>
-    unwrap<CommunityReport[]>(
-      await supabase
-        .from("community_reports")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50),
-    ),
+  queryFn: () => mysqlApi.get<CommunityReport[]>("reports"),
   staleTime: 30 * 1000,
 });
 
 export type NewReport = {
   region_slug: string;
+  locality_id: string | null;
   locality: string | null;
   hazard: string;
   severity: string;
@@ -140,8 +112,7 @@ export type NewReport = {
 };
 
 export async function submitReport(input: NewReport) {
-  const { error } = await supabase.from("community_reports").insert(input);
-  if (error) throw new Error(error.message);
+  await mysqlApi.post("reports", input);
 }
 
 export type Locality = {
@@ -203,52 +174,32 @@ export type Profile = {
 
 export const localitiesQuery = queryOptions({
   queryKey: ["localities"],
-  queryFn: async () =>
-    unwrap<Locality[]>(await supabase.from("localities").select("*").order("name")),
+  queryFn: () => mysqlApi.get<Locality[]>("localities"),
   staleTime: 5 * 60 * 1000,
 });
 
 export const localityForecastsQuery = queryOptions({
   queryKey: ["locality_forecasts"],
-  queryFn: async () =>
-    unwrap<LocalityForecast[]>(await supabase.from("locality_forecasts").select("*")),
+  queryFn: () => mysqlApi.get<LocalityForecast[]>("forecasts"),
   staleTime: 60 * 1000,
 });
 
 export const subscriptionsQuery = queryOptions({
   queryKey: ["sms_subscriptions"],
-  queryFn: async () =>
-    unwrap<SmsSubscription[]>(
-      await supabase.from("sms_subscriptions").select("*").order("created_at"),
-    ),
+  queryFn: () => mysqlApi.get<SmsSubscription[]>("subscriptions"),
   staleTime: 30 * 1000,
 });
 
 export const smsMessagesQuery = queryOptions({
   queryKey: ["sms_messages"],
-  queryFn: async () =>
-    unwrap<SmsMessage[]>(
-      await supabase
-        .from("sms_messages")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50),
-    ),
+  queryFn: () => mysqlApi.get<SmsMessage[]>("messages"),
   staleTime: 15 * 1000,
 });
 
 export function profileQuery(userId: string) {
   return queryOptions({
     queryKey: ["profile", userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return (data ?? null) as Profile | null;
-    },
+    queryFn: async () => (await mysqlSession()) as Profile | null,
   });
 }
 
@@ -256,12 +207,8 @@ export function rolesQuery(userId: string) {
   return queryOptions({
     queryKey: ["roles", userId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
-      if (error) throw new Error(error.message);
-      return (data ?? []).map((row) => row.role as string);
+      const user = await mysqlSession();
+      return user ? [user.role] : [];
     },
   });
 }

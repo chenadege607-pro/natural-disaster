@@ -109,6 +109,7 @@ function ReportPage() {
                   region_slug: regionSlug,
                   hazard,
                   severity,
+                  locality_id: locality.trim() || null,
                   locality: locality.trim() || null,
                   description: description.trim(),
                   reporter_name: reporter.trim() || null,

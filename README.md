@@ -18,11 +18,11 @@ Design requirements:
 - Fully responsive: clean layouts for desktop, tablet, and mobile.
 - Design language should feel trustworthy, clear, and calm-but-urgent-when-needed — use color coding consistently for risk severity (e.g. green/yellow/orange/red), good contrast and accessibility, legible typography.
 - Use realistic mock data for the 10 Cameroon regions so all screens look populated and real.
-- Set up Lovable Cloud so we have a real database ready for community reports, alerts, and region risk data (still seeded with mock/sample data for now), so this is easy to wire to live environmental APIs later.
+- Use the Apache/PHP MySQL backend for community reports, alerts, authentication, and region data.
 
 Do not integrate any external environmental/flood/landslide data API yet — that comes in a follow-up step once the design is approved.
 
-This project was built with [Lovable](https://lovable.dev).
+The frontend uses the Apache/PHP MySQL backend for authentication, alerts, reports, and region data.
 
 ## Build with Lovable
 

@@ -50,6 +50,7 @@ function ExplorePage() {
   const [error, setError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [assistantResponding, setAssistantResponding] = useState(false);
   const [chat, setChat] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
 
   async function findPlaces(event: FormEvent) {
@@ -104,10 +105,11 @@ function ExplorePage() {
 
   async function askAssistant(event: FormEvent) {
     event.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || assistantResponding) return;
     const nextChat = [...chat, { role: "user" as const, content: message.trim() }];
     setMessage("");
     setChat(nextChat);
+    setAssistantResponding(true);
     try {
       const answer = await ask({
         data: {
@@ -116,7 +118,16 @@ function ExplorePage() {
           messages: nextChat,
         },
       });
-      setChat([...nextChat, { role: "assistant", content: answer }]);
+      setChat([...nextChat, { role: "assistant", content: "" }]);
+      for (let index = 0; index < answer.length; index += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 18));
+        const content = answer.slice(0, index + 1);
+        setChat((current) => {
+          const last = current.at(-1);
+          if (!last || last.role !== "assistant") return current;
+          return [...current.slice(0, -1), { ...last, content }];
+        });
+      }
     } catch {
       setChat([
         ...nextChat,
@@ -125,6 +136,8 @@ function ExplorePage() {
           content: "The assistant is unavailable. Configure GROQ_API_KEY in the server .env file.",
         },
       ]);
+    } finally {
+      setAssistantResponding(false);
     }
   }
 
@@ -341,6 +354,15 @@ function ExplorePage() {
                     {item.content}
                   </div>
                 ))}
+                {assistantResponding && (
+                  <div className="mr-8 rounded-lg bg-muted p-3 text-muted-foreground">
+                    <span className="inline-flex items-center gap-1" aria-label="Assistant is typing">
+                      <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-current" />
+                    </span>
+                  </div>
+                )}
               </div>
               <form onSubmit={askAssistant} className="flex gap-2 border-t p-3">
                 <Input
@@ -348,8 +370,8 @@ function ExplorePage() {
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="Ask about this hazard..."
                 />
-                <Button size="icon" type="submit" aria-label="Send message">
-                  <Send />
+                <Button size="icon" type="submit" aria-label="Send message" disabled={assistantResponding}>
+                  {assistantResponding ? <LoaderCircle className="animate-spin" /> : <Send />}
                 </Button>
               </form>
             </div>

@@ -5,7 +5,7 @@ import { LayoutDashboard, LogOut, Menu, ShieldAlert, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { mysqlSignOut } from "@/lib/mysql-api";
 import { useSession } from "@/hooks/useSession";
 
 const links = [
@@ -27,7 +27,7 @@ export function SiteHeader() {
     setOpen(false);
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    await mysqlSignOut();
     void navigate({ to: "/auth", replace: true });
   }
 
@@ -47,7 +47,7 @@ export function SiteHeader() {
         </Link>
 
         <nav className="ml-auto hidden items-center gap-1 lg:flex">
-          {links.map((link) => (
+          {user ? links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -58,7 +58,7 @@ export function SiteHeader() {
             >
               {link.label}
             </Link>
-          ))}
+          )) : null}
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 lg:ml-2 lg:flex">
@@ -113,7 +113,7 @@ export function SiteHeader() {
         )}
       >
         <nav className="mx-auto flex max-w-7xl flex-col px-4 py-2 sm:px-6">
-          {links.map((link) => (
+          {user ? links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -124,7 +124,7 @@ export function SiteHeader() {
             >
               {link.label}
             </Link>
-          ))}
+          )) : null}
           {user ? (
             <>
               <Link
