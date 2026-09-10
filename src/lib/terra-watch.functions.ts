@@ -48,11 +48,11 @@ export const askGroq = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
         temperature: 0.4,
-        max_tokens: 500,
+        max_tokens: 180,
         messages: [
           {
             role: "system",
-            content: `You are SentinelCM's disaster information assistant. Explain data simply and avoid presenting model readings as official warnings. Location: ${data.location}. Hazard data: ${data.hazardData}`,
+            content: `You are SentinelCM's disaster information assistant. Give brief, practical answers in no more than 3 short sentences or 3 bullets. Lead with the direct answer, avoid repetition, and do not present model readings as official warnings. Location: ${data.location}. Hazard data: ${data.hazardData}`,
           },
           ...data.messages,
         ],

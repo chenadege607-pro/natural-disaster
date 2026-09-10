@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { Clock, Loader2, MapPin, MessageSquare, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,8 +19,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
+import { mysqlApi } from "@/lib/mysql-api";
 import {
   localitiesQuery,
   localityForecastsQuery,
@@ -30,7 +29,6 @@ import {
   smsMessagesQuery,
   subscriptionsQuery,
 } from "@/lib/queries";
-import { sendLocalityReport, sendMyDigest } from "@/lib/sms.functions";
 import { asRisk, countdown, exactTime, higherRisk, onsetWindow, relativeTime } from "@/lib/risk";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -70,8 +68,6 @@ function UserDashboard() {
   const [demandLocality, setDemandLocality] = useState("");
   const [demandPhone, setDemandPhone] = useState("");
 
-  const sendReport = useServerFn(sendLocalityReport);
-  const sendDigest = useServerFn(sendMyDigest);
 
   const watched = useMemo(() => {
     const rows = (subs.data ?? []).filter((s) => s.is_active);
@@ -95,16 +91,14 @@ function UserDashboard() {
       if (!user) throw new Error("Not signed in");
       if (!/^\+?[0-9\s-]{8,18}$/.test(phone.trim())) throw new Error("Enter a valid phone number");
       if (!regionSlug) throw new Error("Choose a region");
-      const { error } = await supabase.from("sms_subscriptions").insert({
-        user_id: user.id,
+      const region = (regions.data ?? []).find((item) => item.slug === regionSlug);
+      await mysqlApi.post("subscriptions", {
         phone: phone.trim(),
-        region_slug: regionSlug,
-        locality_id: localityId || null,
-        min_severity: minSeverity,
+        regionId: region?.id ?? null,
+        localityId: localityId || null,
+        minSeverity,
         frequency,
-        is_active: true,
       });
-      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       toast.success("SMS subscription saved");
@@ -117,11 +111,7 @@ function UserDashboard() {
 
   const toggleSub = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { error } = await supabase
-        .from("sms_subscriptions")
-        .update({ is_active: active })
-        .eq("id", id);
-      if (error) throw new Error(error.message);
+      await mysqlApi.patch("subscriptions", { id, is_active: active });
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["sms_subscriptions"] }),
     onError: (error: Error) => toast.error(error.message),
@@ -129,8 +119,7 @@ function UserDashboard() {
 
   const removeSub = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sms_subscriptions").delete().eq("id", id);
-      if (error) throw new Error(error.message);
+      await mysqlApi.post("subscriptions/delete", { id });
     },
     onSuccess: () => {
       toast.success("Subscription removed");
@@ -141,7 +130,7 @@ function UserDashboard() {
 
   const onDemand = useMutation({
     mutationFn: async () =>
-      sendReport({ data: { localityId: demandLocality, phone: demandPhone.trim() } }),
+      mysqlApi.post("sms/locality", { localityId: demandLocality, phone: demandPhone.trim() }),
     onSuccess: (result) => {
       toast.success(
         result.simulated
@@ -155,7 +144,7 @@ function UserDashboard() {
   });
 
   const digest = useMutation({
-    mutationFn: async () => sendDigest({}),
+    mutationFn: async () => mysqlApi.post("sms/digest", {}),
     onSuccess: (result) => {
       toast.success(
         result.simulated ? `${result.sent} digest message(s) simulated` : `${result.sent} SMS sent`,
@@ -196,8 +185,14 @@ function UserDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => digest.mutate()}
-                disabled={digest.isPending}
+                onClick={() => {
+                  if (!(subs.data ?? []).some((subscription) => subscription.is_active)) {
+                    toast.error("Save an active SMS subscription first.");
+                    return;
+                  }
+                  digest.mutate();
+                }}
+                disabled={digest.isPending || subs.isLoading}
               >
                 {digest.isPending ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -206,6 +201,9 @@ function UserDashboard() {
                 )}
                 Send my digest now
               </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Add an active SMS subscription below before requesting a digest.
+              </p>
             </div>
 
             {subs.isLoading || localities.isLoading ? (

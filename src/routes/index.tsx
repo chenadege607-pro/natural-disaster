@@ -13,6 +13,7 @@ import type { ForecastDay } from "@/lib/open-meteo.server";
 import { getWeather } from "@/lib/weather.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { useSession } from "@/hooks/useSession";
 
 function WeatherDemo() {
   const fetchWeather = useServerFn(getWeather);
@@ -152,6 +153,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const { user } = useSession();
   const regions = useQuery(regionsQuery);
   const risks = useQuery(riskQuery);
   const alerts = useQuery(alertsQuery);
@@ -192,8 +194,8 @@ function Home() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button asChild size="lg">
-                  <Link to="/map">
-                    Open the risk map <ArrowRight className="ml-1.5 size-4" />
+                  <Link to={user ? "/map" : "/auth"}>
+                    {user ? "Open the risk map" : "Sign in to continue"} <ArrowRight className="ml-1.5 size-4" />
                   </Link>
                 </Button>
                 <Button
@@ -202,7 +204,9 @@ function Home() {
                   variant="outline"
                   className="border-deep-foreground/25 bg-transparent text-deep-foreground hover:bg-deep-foreground/10 hover:text-deep-foreground"
                 >
-                  <Link to="/alerts">See active alerts</Link>
+                  <Link to={user ? "/alerts" : "/auth"}>
+                    {user ? "See active alerts" : "Sign in to see alerts"}
+                  </Link>
                 </Button>
               </div>
 
@@ -270,8 +274,8 @@ function Home() {
             </p>
           </div>
           <Button asChild variant="ghost">
-            <Link to="/dashboard">
-              My alert dashboard <ArrowRight className="ml-1.5 size-4" />
+            <Link to={user ? "/dashboard" : "/auth"}>
+              {user ? "My alert dashboard" : "Sign in for your dashboard"} <ArrowRight className="ml-1.5 size-4" />
             </Link>
           </Button>
 
@@ -316,13 +320,22 @@ function Home() {
                         <dd className="font-medium text-foreground">{row.soil_saturation_pct}%</dd>
                       </div>
                     </dl>
-                    <Link
-                      to="/regions/$slug"
-                      params={{ slug: row.region_slug }}
-                      className="mt-4 inline-flex items-center text-sm font-semibold text-primary hover:underline"
-                    >
-                      Region detail <ArrowRight className="ml-1 size-4" />
-                    </Link>
+                    {user ? (
+                      <Link
+                        to="/regions/$slug"
+                        params={{ slug: row.region_slug }}
+                        className="mt-4 inline-flex items-center text-sm font-semibold text-primary hover:underline"
+                      >
+                        Region detail <ArrowRight className="ml-1 size-4" />
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/auth"
+                        className="mt-4 inline-flex items-center text-sm font-semibold text-primary hover:underline"
+                      >
+                        Sign in for region details <ArrowRight className="ml-1 size-4" />
+                      </Link>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -356,7 +369,7 @@ function Home() {
                   ))}
             </div>
             <Button asChild variant="outline" className="mt-6">
-              <Link to="/alerts">All alerts</Link>
+              <Link to={user ? "/alerts" : "/auth"}>{user ? "All alerts" : "Sign in to view alerts"}</Link>
             </Button>
           </div>
 
@@ -371,7 +384,9 @@ function Home() {
               feed and on the officials dashboard for review.
             </p>
             <Button asChild size="lg" className="mt-6 w-full sm:w-auto">
-              <Link to="/report">Report an incident</Link>
+              <Link to={user ? "/report" : "/auth"}>
+                {user ? "Report an incident" : "Sign in to report an incident"}
+              </Link>
             </Button>
             <p className="mt-4 text-xs text-muted-foreground">
               For life-threatening emergencies, always contact local civil protection services

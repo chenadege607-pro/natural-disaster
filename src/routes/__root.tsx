@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  redirect,
   useRouter,
   HeadContent,
   Scripts,
@@ -10,9 +11,8 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { supabase } from "@/integrations/supabase/client";
+import { mysqlSession } from "@/lib/mysql-api";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -40,9 +40,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -76,6 +73,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  ssr: false,
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === "/" || location.pathname === "/auth") return;
+    if (!(await mysqlSession())) throw redirect({ to: "/auth" });
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -134,12 +136,8 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      void router.invalidate();
-      if (event !== "SIGNED_OUT") void queryClient.invalidateQueries();
-    });
-    return () => data.subscription.unsubscribe();
+    void router.invalidate();
+    void queryClient.invalidateQueries();
   }, [router, queryClient]);
 
   return (
